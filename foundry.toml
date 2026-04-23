@@ -4,3 +4,15 @@ out = "out"
 libs = ["lib"]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+
+
+# 配置 RPC 节点别名
+[rpc_endpoints]
+sepolia = "${SEPOLIA_RPC_URL}"
+
+# 配置 Etherscan API Key
+[etherscan]
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
+
+

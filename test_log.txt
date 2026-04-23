@@ -1,0 +1,9 @@
+No files changed, compilation skipped
+
+Ran 3 tests for test/Bank.t.sol:BankTest
+[PASS] test_saveMoney() (gas: 73776)
+[PASS] test_saveMoney_top3User() (gas: 257348)
+[PASS] test_withdraw() (gas: 86088)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 871.37µs (437.35µs CPU time)
+
+Ran 1 test suite in 11.92ms (871.37µs CPU time): 3 tests passed, 0 failed, 0 skipped (3 total tests)
