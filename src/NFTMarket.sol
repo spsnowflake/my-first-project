@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "contracts/IERC20Interface.sol";
-import "contracts/IERC721Interface.sol";
+import "src/IERC20Interface.sol";
+import "src/IERC721Interface.sol";
 
 contract NFTMarket{
 

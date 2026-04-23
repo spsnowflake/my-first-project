@@ -11,7 +11,12 @@ contract NFTMarket is Test {
         nft_market = new NFTMarket();
     }
 
-    
+
+    function test_list() public{
+        
+    }
+
+
 
 
 
