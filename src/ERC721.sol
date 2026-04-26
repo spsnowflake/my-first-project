@@ -134,7 +134,7 @@ contract BaseERC721 {
      */
     function mint(address to, uint256 tokenId) public {
         require(to != address(0), "ERC721: mint to the zero address");
-        require(address(0) != _owners[tokenId], "ERC721: token already minted");
+        require(address(0) == _owners[tokenId], "ERC721: token already minted");
         _owners[tokenId] = to;
         _balances[to]++;
         emit Transfer(address(0), to, tokenId);
