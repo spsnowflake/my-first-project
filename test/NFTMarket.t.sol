@@ -143,6 +143,7 @@ contract NFTMarketTest is Test {
         vm.startPrank(buyer2);
         erc721.setApprovalForAll(address(nft_market),true);
         erc20.approve(address(nft_market), 100 ether);
+        vm.stopPrank();
         // 超额支付
         vm.startPrank(buyer);
         vm.expectRevert("tokenId must !=0, amount must == tokenPrice[tokenID]");
