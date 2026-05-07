@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "local": "bash scripts/start-local.sh",
+    "local:fe": "bash scripts/start-local.sh --with-fe"
+  },
   "dependencies": {
     "viem": "^2.48.8"
   }
