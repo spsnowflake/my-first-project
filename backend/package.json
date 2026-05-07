@@ -1,0 +1,19 @@
+{
+  "name": "my-first-project-backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx index.ts",
+    "approve": "tsx index.ts approve",
+    "market-demo": "tsx index.ts market-demo",
+    "listen": "tsx index.ts listen"
+  },
+  "dependencies": {
+    "viem": "^2.48.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

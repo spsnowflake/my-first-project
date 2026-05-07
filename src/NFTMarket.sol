@@ -11,6 +11,8 @@ contract NFTMarket{
 
     event List(uint tokenId,address sellPeople,uint amount);
     event BuyNFT(address buyer,uint tokenID,uint amount);
+    /// @notice ERC20 通过 tokensReceived 回调成交时触发（与直接 buyNFT 区分，便于链下监听）
+    event PurchaseViaERC20Callback(address buyer, uint256 tokenId, uint256 amount);
 
 // tokenID 对应的  价格
     mapping (uint =>uint)public tokenPrice;
@@ -94,6 +96,7 @@ contract NFTMarket{
         erc721Token.safeTransferFrom(seller,from,tokenID);
 
         emit BuyNFT(from,tokenID,amount);
+        emit PurchaseViaERC20Callback(from, tokenID, amount);
         return true;
      }
 }
