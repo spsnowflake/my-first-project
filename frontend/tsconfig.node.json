@@ -4,7 +4,8 @@
     "target": "es2023",
     "lib": ["ES2023"],
     "module": "esnext",
-    "types": ["node"],
+    /* 不用 "types": ["node"]：未安装依赖时会报 TS2688；空数组表示本配置不自动拉取 @types/* */
+    "types": [],
     "skipLibCheck": true,
 
     /* Bundler mode */

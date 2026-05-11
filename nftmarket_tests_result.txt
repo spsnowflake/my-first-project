@@ -1,0 +1,22 @@
+No files changed, compilation skipped
+
+Ran 3 tests for test/NFTMarket.t.sol:NFTMarketTest
+[PASS] testFuzz_list(uint256,address) (runs: 257, μ: 251428, ~: 251855)
+[PASS] test_buyNFT() (gas: 665698)
+[PASS] test_list() (gas: 239871)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 63.59ms (63.60ms CPU time)
+
+Ran 1 test for test/NFTMarketInvariant.t.sol:NFTMarketInvariantTest
+[PASS] invariant_marketNeverHoldsERC20() (runs: 256, calls: 128000, reverts: 0)
+
+╭------------------+----------+-------+---------+----------╮
+| Contract         | Selector | Calls | Reverts | Discards |
++==========================================================+
+| NFTMarketHandler | buy      | 64135 | 0       | 0        |
+|------------------+----------+-------+---------+----------|
+| NFTMarketHandler | list     | 63865 | 0       | 0        |
+╰------------------+----------+-------+---------+----------╯
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 17.79s (17.79s CPU time)
+
+Ran 2 test suites in 17.79s (17.85s CPU time): 4 tests passed, 0 failed, 0 skipped (4 total tests)

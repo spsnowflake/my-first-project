@@ -4,6 +4,6 @@
     "local:fe": "bash scripts/start-local.sh --with-fe"
   },
   "dependencies": {
-    "viem": "^2.48.8"
+    "viem": "^2.48.11"
   }
 }
