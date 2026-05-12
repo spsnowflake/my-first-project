@@ -3,12 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "wallet-cli": "tsx wallet-cli.ts",
     "start": "tsx index.ts",
     "approve": "tsx index.ts approve",
     "market-demo": "tsx index.ts market-demo",
     "listen": "tsx index.ts listen"
   },
   "dependencies": {
+    "dotenv": "^16.4.7",
     "viem": "^2.48.8"
   },
   "devDependencies": {
