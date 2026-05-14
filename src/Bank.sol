@@ -11,8 +11,10 @@ contract Bank{
 // 合约的存款
     // uint counter;
 
-    constructor(){
-        owner = msg.sender;
+    // constructor(){
+        // owner = msg.sender;
+    constructor(address initialOwner) {
+        owner = initialOwner;
     }
 
     function getTop3User()public view returns (address[3] memory){

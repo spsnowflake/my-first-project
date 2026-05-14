@@ -13,7 +13,7 @@ contract BankTest is Test {
 
 
     function setUp() public {
-        bank = new Bank();
+        bank = new Bank(address(this));
         vm.deal(user1, 100 ether);
         vm.deal(user2, 100 ether);
         vm.deal(user3, 100 ether);
