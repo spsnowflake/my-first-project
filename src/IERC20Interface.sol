@@ -9,3 +9,16 @@ interface IERC20 {
     function allowance(address _owner, address _spender) external view returns (uint256 remaining);
     function tokensReceived(address from,uint value)external returns (bool);
 }
+
+/// EIP-2612：支持离线签名授权（permit）的 ERC20 扩展
+interface IERC20Permit {
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external;
+}

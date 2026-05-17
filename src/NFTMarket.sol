@@ -3,11 +3,13 @@ pragma solidity ^0.8.0;
 
 import "src/IERC20Interface.sol";
 import "src/IERC721Interface.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 contract NFTMarket{
 
     IERC20 public erc20Token;
     IERC721 public erc721Token;
+    address owner;
 
     event List(uint tokenId,address sellPeople,uint amount);
     event BuyNFT(address buyer,uint tokenID,uint amount);
@@ -17,11 +19,50 @@ contract NFTMarket{
 // tokenID 对应的  价格
     mapping (uint =>uint)public tokenPrice;
     mapping (uint => address)public tokenSeller;
+    mapping (uint => uint) public buyNonces;
+
+    bytes32 public immutable DOMAIN_SEPARATOR;
 
      constructor(IERC20 erc20,IERC721 erc721){
          erc20Token = erc20;
          erc721Token = erc721;
+         owner = msg.sender;
+
+         DOMAIN_SEPARATOR = keccak256(
+             abi.encode(
+                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                 keccak256(bytes("NFTMarket")),
+                 keccak256(bytes("1")),
+                 block.chainid,
+                 address(this)
+             )
+         );
      }
+
+    function permitBuyNFT(uint tokenId,address buyer,uint amount,uint nonce,uint deadline,uint8 v,bytes32 r,bytes32 s)external{
+        require(deadline >= block.timestamp,"deadline is in the past");
+        require(nonce == buyNonces[tokenId],"nonce is not correct");
+        require(buyer == msg.sender,"buyer is not correct");
+
+        bytes32 hashStruct = keccak256(abi.encode(
+            keccak256("PermitBuyNFT(uint tokenId,address buyer,uint amount,uint nonce,uint deadline)"),
+            tokenId,
+            amount,
+            buyer,
+            nonce,
+            deadline
+        ));
+        bytes32 hash = keccak256(abi.encodePacked(
+            "\x19\x01",
+            DOMAIN_SEPARATOR,
+            hashStruct
+        ));
+        address signer = ECDSA.recover(hash, v, r, s);
+        require(signer == owner,"invalid signer");
+        buyNonces[tokenId]++;
+        buyNFT(tokenId,amount);
+    
+    }
 
     // 上架 NFT
      function list(uint tokenId,uint amount) external  returns (bool){
@@ -37,7 +78,7 @@ contract NFTMarket{
      }
 
 //   买家购买NFT
-     function buyNFT(uint tokenID, uint amount) external returns (bool){
+     function buyNFT(uint tokenID, uint amount) public returns (bool){
         require(tokenID!=0 && amount ==tokenPrice[tokenID],"tokenId must !=0, amount must == tokenPrice[tokenID]");
         address NFTOwnerOf = erc721Token.ownerOf(tokenID);
         // 检查当前的 拥有者和储存的拥有者是否同一人

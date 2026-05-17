@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useAppKitAccount } from '@reown/appkit/react'
 import { isAddress, parseUnits, formatUnits } from 'viem'
 import {
@@ -6,9 +6,17 @@ import {
   useChains,
   usePublicClient,
   useReadContract,
+  useWalletClient,
   useWriteContract,
 } from 'wagmi'
-import { erc20Abi, tokenBankAbi } from './abis/tokenBank'
+import { erc20Abi, erc20PermitAbi, tokenBankAbi } from './abis/tokenBank'
+import {
+  buildPermitDomain,
+  permitTypes,
+  splitPermitSignature,
+  verifyPermitSignature,
+  type StoredPermitSignature,
+} from './permitEip2612'
 
 function isBankAddress(v: string | undefined): v is `0x${string}` {
   return Boolean(v && isAddress(v))
@@ -25,6 +33,12 @@ export default function TokenBank() {
   const [amountStr, setAmountStr] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [permitOwnerStr, setPermitOwnerStr] = useState('')
+  const [permitAmountStr, setPermitAmountStr] = useState('')
+  const [permitSig, setPermitSig] = useState<StoredPermitSignature | null>(null)
+  const [permitVerifyMsg, setPermitVerifyMsg] = useState<string | null>(null)
+  const [permitBusy, setPermitBusy] = useState(false)
 
   const { data: tokenAddress } = useReadContract({
     address: bankAddress,
@@ -47,6 +61,26 @@ export default function TokenBank() {
     abi: erc20Abi,
     functionName: 'symbol',
     query: { enabled: Boolean(token) },
+  })
+
+  const { data: tokenName } = useReadContract({
+    address: token,
+    abi: erc20PermitAbi,
+    functionName: 'name',
+    query: { enabled: Boolean(token) },
+  })
+
+  const permitOwner = isAddress(permitOwnerStr) ? (permitOwnerStr as `0x${string}`) : undefined
+
+  const {
+    data: permitNonce = 0n,
+    refetch: refetchPermitNonce,
+  } = useReadContract({
+    address: token,
+    abi: erc20PermitAbi,
+    functionName: 'nonces',
+    args: permitOwner ? [permitOwner] : undefined,
+    query: { enabled: Boolean(token && permitOwner) },
   })
 
   const {
@@ -87,7 +121,14 @@ export default function TokenBank() {
   const chain = chains.find((c) => c.id === chainId)
 
   const publicClient = usePublicClient()
+  const { data: walletClient } = useWalletClient()
   const { writeContractAsync } = useWriteContract()
+
+  useEffect(() => {
+    if (address && !permitOwnerStr) {
+      setPermitOwnerStr(address)
+    }
+  }, [address, permitOwnerStr])
 
   const amountWei = useMemo(() => {
     try {
@@ -97,6 +138,15 @@ export default function TokenBank() {
       return null
     }
   }, [amountStr, decimals])
+
+  const permitAmountWei = useMemo(() => {
+    try {
+      if (!permitAmountStr.trim()) return null
+      return parseUnits(permitAmountStr, Number(decimals))
+    } catch {
+      return null
+    }
+  }, [permitAmountStr, decimals])
 
   const walletBalanceSafe = walletBalance ?? 0n
   const walletFormatted =
@@ -201,6 +251,146 @@ export default function TokenBank() {
     writeContractAsync,
     refetchWallet,
     refetchBank,
+  ])
+
+  const doPermitSign = useCallback(async () => {
+    if (!token || !bankAddress || !address || !walletClient || !permitOwner || !permitAmountWei) {
+      setError('请填写有效的持有人地址与金额，并连接钱包。')
+      return
+    }
+    if (permitOwner.toLowerCase() !== address.toLowerCase()) {
+      setError('签名须由持有人地址对应的钱包发起（地址与当前钱包不一致）。')
+      return
+    }
+    if (permitAmountWei <= 0n) {
+      setError('金额须大于 0')
+      return
+    }
+    const domainName = tokenName ?? symbol
+    setError(null)
+    setPermitVerifyMsg(null)
+    setPermitBusy(true)
+    try {
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600)
+      const message = {
+        owner: permitOwner,
+        spender: bankAddress,
+        value: permitAmountWei,
+        nonce: permitNonce,
+        deadline,
+      }
+      const domain = buildPermitDomain({
+        name: domainName,
+        chainId,
+        verifyingContract: token,
+      })
+      const signature = await walletClient.signTypedData({
+        account: permitOwner,
+        domain,
+        types: permitTypes,
+        primaryType: 'Permit',
+        message,
+      })
+      const { v, r, s } = splitPermitSignature(signature)
+      setPermitSig({ message, domain, signature, v, r, s })
+    } catch (e) {
+      setPermitSig(null)
+      setError(e instanceof Error ? e.message : '签名失败')
+    } finally {
+      setPermitBusy(false)
+    }
+  }, [
+    token,
+    bankAddress,
+    address,
+    walletClient,
+    permitOwner,
+    permitAmountWei,
+    tokenName,
+    symbol,
+    chainId,
+    permitNonce,
+  ])
+
+  const doPermitVerify = useCallback(async () => {
+    if (!permitSig) {
+      setPermitVerifyMsg('请先完成「签名」。')
+      return
+    }
+    setPermitBusy(true)
+    setPermitVerifyMsg(null)
+    try {
+      const recovered = await verifyPermitSignature(
+        permitSig.domain,
+        permitSig.message,
+        permitSig.signature,
+      )
+      const ok =
+        recovered.toLowerCase() === permitSig.message.owner.toLowerCase()
+      if (ok) {
+        setPermitVerifyMsg(
+          `验证成功：签名者 ${recovered} 与授权地址 ${permitSig.message.owner} 一致。`,
+        )
+      } else {
+        setPermitVerifyMsg(
+          `验证失败：恢复地址 ${recovered}，期望 ${permitSig.message.owner}。`,
+        )
+      }
+    } catch (e) {
+      setPermitVerifyMsg(
+        e instanceof Error ? `验证失败：${e.message}` : '验证失败',
+      )
+    } finally {
+      setPermitBusy(false)
+    }
+  }, [permitSig])
+
+  const doPermitDeposit = useCallback(async () => {
+    if (!bankAddress || !permitSig || !publicClient || !chain || !address) {
+      setError('请先签名、连接钱包，并确保网络已连接。')
+      return
+    }
+    setError(null)
+    setPermitBusy(true)
+    const account = address as `0x${string}`
+    try {
+      const { owner, value, deadline } = permitSig.message
+      const { v, r, s } = permitSig
+      const hash = await writeContractAsync({
+        address: bankAddress,
+        abi: tokenBankAbi,
+        functionName: 'permitDeposit',
+        args: [owner, value, deadline, v, r, s],
+        chain,
+        account,
+      })
+      await publicClient.waitForTransactionReceipt({ hash })
+      await Promise.all([
+        refetchWallet(),
+        refetchBank(),
+        refetchAllowance(),
+        refetchPermitNonce(),
+      ])
+      setPermitSig(null)
+      setPermitVerifyMsg(
+        'permitDeposit 已确认。nonce 已更新，请重新签名后再存下一笔。',
+      )
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'permitDeposit 失败')
+    } finally {
+      setPermitBusy(false)
+    }
+  }, [
+    bankAddress,
+    permitSig,
+    publicClient,
+    chain,
+    address,
+    writeContractAsync,
+    refetchWallet,
+    refetchBank,
+    refetchAllowance,
+    refetchPermitNonce,
   ])
 
   if (!bankAddress) {
@@ -423,10 +613,150 @@ export default function TokenBank() {
               {error}
             </p>
           ) : null}
+          <hr style={{ width: '100%', maxWidth: 420, border: 'none', borderTop: '1px solid #eee' }} />
+
+          <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>
+            Permit 离线签名存款（EIP-2612）
+          </h2>
+          <p style={{ margin: 0, fontSize: '0.8rem', color: '#666', maxWidth: 420, textAlign: 'center', lineHeight: 1.5 }}>
+            授权 TokenBank 代扣你的 {symbol}。须用持有人钱包签名；金额单位为代币（非原生 ETH）。
+          </p>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: '0.85rem' }}>持有人地址（存款人）</span>
+            <input
+              type="text"
+              value={permitOwnerStr}
+              onChange={(e) => {
+                setPermitOwnerStr(e.target.value.trim())
+                setPermitSig(null)
+                setPermitVerifyMsg(null)
+              }}
+              placeholder="0x…"
+              style={inputStyle}
+            />
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: '0.85rem' }}>金额（{symbol}）</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={permitAmountStr}
+              onChange={(e) => {
+                setPermitAmountStr(e.target.value)
+                setPermitSig(null)
+                setPermitVerifyMsg(null)
+              }}
+              placeholder="0.0"
+              style={inputStyle}
+            />
+          </label>
+
+          {permitOwner && token ? (
+            <p style={{ margin: 0, fontSize: '0.75rem', color: '#666' }}>
+              当前 nonce：{permitNonce.toString()}
+            </p>
+          ) : null}
+
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              type="button"
+              disabled={
+                permitBusy ||
+                !permitOwner ||
+                !permitAmountWei ||
+                permitAmountWei <= 0n ||
+                !walletClient
+              }
+              onClick={() => void doPermitSign()}
+              style={{ ...btnStyle, opacity: permitBusy ? 0.5 : 1 }}
+            >
+              {permitBusy ? '处理中…' : '签名'}
+            </button>
+            <button
+              type="button"
+              disabled={permitBusy || !permitSig}
+              onClick={() => void doPermitVerify()}
+              style={{ ...btnStyle, opacity: permitBusy || !permitSig ? 0.5 : 1 }}
+            >
+              验证签名
+            </button>
+            <button
+              type="button"
+              disabled={permitBusy || !permitSig}
+              onClick={() => void doPermitDeposit()}
+              style={{
+                ...btnStyle,
+                background: '#2a5',
+                opacity: permitBusy || !permitSig ? 0.5 : 1,
+              }}
+              title="验证通过后，可由任意账户代提交 permitDeposit"
+            >
+              提交存款
+            </button>
+          </div>
+
+          {permitSig ? (
+            <pre
+              style={{
+                margin: 0,
+                padding: '0.75rem',
+                fontSize: '0.7rem',
+                maxWidth: 420,
+                width: '100%',
+                boxSizing: 'border-box',
+                overflow: 'auto',
+                background: '#f6f6f6',
+                borderRadius: 8,
+                textAlign: 'left',
+              }}
+            >
+              {JSON.stringify(
+                {
+                  owner: permitSig.message.owner,
+                  spender: permitSig.message.spender,
+                  value: permitSig.message.value.toString(),
+                  nonce: permitSig.message.nonce.toString(),
+                  deadline: permitSig.message.deadline.toString(),
+                  v: permitSig.v,
+                  r: permitSig.r,
+                  s: permitSig.s,
+                  signature: permitSig.signature,
+                },
+                null,
+                2,
+              )}
+            </pre>
+          ) : (
+            <p style={{ margin: 0, fontSize: '0.8rem', color: '#888' }}>签名结果将显示在此处</p>
+          )}
+
+          {permitVerifyMsg ? (
+            <p
+              style={{
+                margin: 0,
+                fontSize: '0.85rem',
+                maxWidth: 420,
+                textAlign: 'center',
+                color: permitVerifyMsg.startsWith('验证成功') ? '#0a6b0a' : '#b00020',
+                lineHeight: 1.5,
+              }}
+            >
+              {permitVerifyMsg}
+            </p>
+          ) : null}
         </>
       )}
     </div>
   )
+}
+
+const inputStyle: CSSProperties = {
+  padding: '0.5rem 0.65rem',
+  borderRadius: 8,
+  border: '1px solid #ccc',
+  minWidth: 220,
 }
 
 const btnStyle: CSSProperties = {

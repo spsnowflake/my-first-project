@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "src/IERC20Interface.sol";
-// import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/Address.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 contract BaseERC20 {
 
@@ -14,7 +14,8 @@ contract BaseERC20 {
 // 余额
     mapping (address => uint256) balances; 
 // 授权方授权被授权方多少token
-    mapping (address => mapping (address => uint256)) allowances; 
+    mapping (address => mapping (address => uint256)) allowances;
+    bytes32 public immutable DOMAIN_SEPARATOR;
 
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);
@@ -26,8 +27,7 @@ contract BaseERC20 {
         symbol = "BERC20";
         decimals = 18;
         totalSupply = 100000000*10**decimals;
-
-        balances[msg.sender] = totalSupply;  
+        balances[msg.sender] = totalSupply;
     }
 
     function transferWithCallback(address to,uint value)external returns (bool){

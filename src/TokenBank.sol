@@ -8,13 +8,33 @@ import "src/ITokenReceiver.sol";
 contract TokenBank {
     // 一开始就固定币种
     IERC20 public immutable erc20_address;
-    constructor(IERC20 erc20_token){
+    IERC20Permit public immutable erc20_permit;
+
+    constructor(IERC20 erc20_token) {
         erc20_address = erc20_token;
+        erc20_permit = IERC20Permit(address(erc20_token));
     }
 
     event Deposit(address, uint);
     event Withdraw(address, uint);
     mapping (address => uint) public  balances;
+
+
+
+function permitDeposit(address owner,uint value,uint deadline,uint8 v,bytes32 r,bytes32 s)external {
+    erc20_permit.permit(owner, address(this), value, deadline, v, r, s);
+    erc20_address.transferFrom(owner,address(this),value);
+    balances[owner] += value;
+    emit Deposit(owner,value);
+}
+
+
+
+
+
+
+
+
 
 // 供合约调用的回调函数
 function tokensReceived(address from,uint value)external returns (bool){
@@ -36,7 +56,7 @@ function tokensReceived(address from,uint value)external returns (bool){
         bool result = erc20_address.transferFrom(msg.sender,address(this),amount);
         require(result,"transferFrom is false");
         balances[msg.sender] += amount;
-       
+           
     
         emit Deposit(msg.sender,amount);
     }
