@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useAppKitAccount } from '@reown/appkit/react'
-import { isAddress, parseUnits, formatUnits } from 'viem'
+import { isAddress, maxUint256, parseUnits, formatUnits } from 'viem'
 import {
   useChainId,
   useChains,
@@ -17,6 +17,13 @@ import {
   verifyPermitSignature,
   type StoredPermitSignature,
 } from './permitEip2612'
+import {
+  buildPermit2Domain,
+  buildPermit2TransferMessage,
+  permit2Deadline,
+  permit2TransferTypes,
+  randomPermit2Nonce,
+} from './permit2Eip712'
 
 function isBankAddress(v: string | undefined): v is `0x${string}` {
   return Boolean(v && isAddress(v))
@@ -28,6 +35,12 @@ export default function TokenBank() {
     import.meta.env.VITE_TOKEN_BANK_ADDRESS?.trim() || undefined
   const bankAddress = isBankAddress(bankAddressRaw)
     ? bankAddressRaw
+    : undefined
+
+  const permit2AddressRaw =
+    import.meta.env.VITE_PERMIT2_ADDRESS?.trim() || undefined
+  const permit2Address = isBankAddress(permit2AddressRaw)
+    ? permit2AddressRaw
     : undefined
 
   const [amountStr, setAmountStr] = useState('')
@@ -107,6 +120,18 @@ export default function TokenBank() {
         : undefined,
     query: { enabled: Boolean(token && address && bankAddress) },
   })
+
+  const { data: allowancePermit2 = 0n, refetch: refetchAllowancePermit2 } =
+    useReadContract({
+      address: token,
+      abi: erc20Abi,
+      functionName: 'allowance',
+      args:
+        token && address && permit2Address
+          ? [address as `0x${string}`, permit2Address]
+          : undefined,
+      query: { enabled: Boolean(token && address && permit2Address) },
+    })
 
   const { data: bankBalance = 0n, refetch: refetchBank } = useReadContract({
     address: bankAddress,
@@ -251,6 +276,100 @@ export default function TokenBank() {
     writeContractAsync,
     refetchWallet,
     refetchBank,
+  ])
+
+  const doPermit2Deposit = useCallback(async () => {
+    if (
+      !bankAddress ||
+      !token ||
+      !permit2Address ||
+      !address ||
+      !walletClient ||
+      !publicClient ||
+      !amountWei ||
+      !chain
+    ) {
+      setError('请填写金额并连接钱包；确认已配置 VITE_PERMIT2_ADDRESS。')
+      return
+    }
+    if (chainId !== 11155111) {
+      setError('Permit2 作业请使用 Sepolia 测试网（chainId 11155111）。')
+      return
+    }
+    setError(null)
+    setBusy(true)
+    const account = address as `0x${string}`
+    try {
+      if (walletBalance !== undefined && amountWei > walletBalance) {
+        setError('钱包 TOKEN 余额不足')
+        return
+      }
+      if (allowancePermit2 < amountWei) {
+        const approveHash = await writeContractAsync({
+          address: token,
+          abi: erc20Abi,
+          functionName: 'approve',
+          args: [permit2Address, maxUint256],
+          chain,
+          account,
+        })
+        await publicClient.waitForTransactionReceipt({ hash: approveHash })
+        await refetchAllowancePermit2()
+      }
+      const nonce = randomPermit2Nonce()
+      const deadline = permit2Deadline()
+      const domain = buildPermit2Domain({
+        chainId,
+        verifyingContract: permit2Address,
+      })
+      const message = buildPermit2TransferMessage({
+        token,
+        spender: bankAddress,
+        nonce,
+        deadline,
+      })
+      const signature = await walletClient.signTypedData({
+        account,
+        domain,
+        types: permit2TransferTypes,
+        primaryType: 'PermitTransferFrom',
+        message,
+      })
+      const hash = await writeContractAsync({
+        address: bankAddress,
+        abi: tokenBankAbi,
+        functionName: 'depositWithPermit2',
+        args: [account, amountWei, nonce, deadline, signature],
+        chain,
+        account,
+      })
+      await publicClient.waitForTransactionReceipt({ hash })
+      await Promise.all([
+        refetchWallet(),
+        refetchBank(),
+        refetchAllowancePermit2(),
+      ])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'permit2 存款失败')
+    } finally {
+      setBusy(false)
+    }
+  }, [
+    bankAddress,
+    token,
+    permit2Address,
+    address,
+    walletClient,
+    publicClient,
+    amountWei,
+    chain,
+    chainId,
+    walletBalance,
+    allowancePermit2,
+    writeContractAsync,
+    refetchWallet,
+    refetchBank,
+    refetchAllowancePermit2,
   ])
 
   const doPermitSign = useCallback(async () => {
@@ -605,6 +724,44 @@ export default function TokenBank() {
               }}
             >
               {busy ? '处理中…' : '取款'}
+            </button>
+            <button
+              type="button"
+              disabled={
+                busy ||
+                !amountWei ||
+                amountWei <= 0n ||
+                !permit2Address ||
+                !walletClient ||
+                walletBalanceReadError ||
+                walletBalancePending ||
+                (walletBalance !== undefined && amountWei > walletBalance)
+              }
+              title={
+                !permit2Address
+                  ? '请在 frontend/.env 配置 VITE_PERMIT2_ADDRESS'
+                  : chainId !== 11155111
+                    ? '请切换到 Sepolia'
+                    : 'approve/签名须由持币人完成；提交交易时 owner 为当前连接地址（可由他人代付 gas）'
+              }
+              onClick={() => void doPermit2Deposit()}
+              style={{
+                ...btnStyle,
+                background: '#1a4d8c',
+                opacity:
+                  busy ||
+                  !amountWei ||
+                  amountWei <= 0n ||
+                  !permit2Address ||
+                  !walletClient ||
+                  walletBalanceReadError ||
+                  walletBalancePending ||
+                  (walletBalance !== undefined && amountWei > walletBalance)
+                    ? 0.45
+                    : 1,
+              }}
+            >
+              {busy ? '处理中…' : 'permit2存款'}
             </button>
           </div>
 

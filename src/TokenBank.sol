@@ -4,22 +4,49 @@ pragma solidity ^0.8.0;
 
 import "src/IERC20Interface.sol";
 import "src/ITokenReceiver.sol";
+import {IPermit2} from "src/IPermit2Interface.sol";
 
 contract TokenBank {
     // 一开始就固定币种
     IERC20 public immutable erc20_address;
     IERC20Permit public immutable erc20_permit;
+    IPermit2 public immutable permit2;
 
-    constructor(IERC20 erc20_token) {
+    constructor(IERC20 erc20_token,IPermit2 permit_2) {
         erc20_address = erc20_token;
         erc20_permit = IERC20Permit(address(erc20_token));
+        permit2 = permit_2;
     }
 
+// 用户存钱事件
     event Deposit(address, uint);
+    // 用户取钱事件
     event Withdraw(address, uint);
-    mapping (address => uint) public  balances;
+    // 用户余额映射
+    mapping (address => uint) public balances;
 
-
+// owner 离线签名存钱,用于解决用户离线签名存钱的问题
+function depositWithPermit2(address owner,uint value,uint256 nonce,uint deadline,bytes calldata signature)external {
+    permit2.permitTransferFrom(
+        IPermit2.PermitTransferFrom({
+            permitted: IPermit2.TokenPermissions({
+                token: address(erc20_address),
+                amount: type(uint256).max
+            }),
+            nonce: nonce,
+            deadline: deadline
+        }),
+        IPermit2.SignatureTransferDetails({
+            to: address(this),
+            requestedAmount: value
+        }),
+        owner,
+        signature
+    );
+    balances[owner] += value;
+    emit Deposit(owner,value);
+    
+}
 
 function permitDeposit(address owner,uint value,uint deadline,uint8 v,bytes32 r,bytes32 s)external {
     erc20_permit.permit(owner, address(this), value, deadline, v, r, s);
@@ -27,13 +54,6 @@ function permitDeposit(address owner,uint value,uint deadline,uint8 v,bytes32 r,
     balances[owner] += value;
     emit Deposit(owner,value);
 }
-
-
-
-
-
-
-
 
 
 // 供合约调用的回调函数
