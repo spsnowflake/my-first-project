@@ -12,10 +12,15 @@ contract TokenBank {
     IERC20Permit public immutable erc20_permit;
     IPermit2 public immutable permit2;
 
-    constructor(IERC20 erc20_token,IPermit2 permit_2) {
+    // constructor(IERC20 erc20_token,IPermit2 permit_2) {
+    //     erc20_address = erc20_token;
+    //     erc20_permit = IERC20Permit(address(erc20_token));
+    //     permit2 = permit_2;
+    // }
+
+    constructor(IERC20 erc20_token) {
         erc20_address = erc20_token;
         erc20_permit = IERC20Permit(address(erc20_token));
-        permit2 = permit_2;
     }
 
 // 用户存钱事件

@@ -8,11 +8,15 @@ import {IERC20} from "src/IERC20Interface.sol";
 import {IERC721} from "src/IERC721Interface.sol";
 import {BaseERC20} from "src/ERC20.sol";
 import {BaseERC721} from "src/ERC721.sol";
+import {ERC2612_Spsf} from "src/ERC2612_Spsf.sol";
+
+
 
 contract NFTMarketTest is Test {
     NFTMarket public nft_market;
     BaseERC20 public erc20;
     BaseERC721 public erc721;
+    ERC2612_Spsf public erc2612_spsf;
     address user1 = makeAddr("1");
     address user2 = makeAddr("2");
     address seller = makeAddr("seller");
@@ -25,6 +29,7 @@ contract NFTMarketTest is Test {
     function setUp() public{
         erc20 = new BaseERC20();
         erc721 = new BaseERC721("BaseERC721", "BERC721", "ipfs://base/");
+
 
         nft_market = new NFTMarket(IERC20(address(erc20)), IERC721(address(erc721)));
         vm.deal(user1, 100 ether);

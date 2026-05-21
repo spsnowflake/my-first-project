@@ -39,6 +39,7 @@ contract NFTMarket{
          );
      }
 
+    // 白名单用户离线签名购买NFT
     function permitBuyNFT(uint tokenId,address buyer,uint amount,uint nonce,uint deadline,uint8 v,bytes32 r,bytes32 s)external{
         require(deadline >= block.timestamp,"deadline is in the past");
         require(nonce == buyNonces[tokenId],"nonce is not correct");
