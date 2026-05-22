@@ -7,13 +7,18 @@
     "start": "tsx index.ts",
     "approve": "tsx index.ts approve",
     "market-demo": "tsx index.ts market-demo",
-    "listen": "tsx index.ts listen"
+    "listen": "tsx index.ts listen",
+    "sync": "tsx transfer-indexer.ts",
+    "api": "tsx api-server.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
+    "express": "^5.2.1",
+    "mysql2": "^3.22.3",
     "viem": "^2.48.8"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/node": "^22.10.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
