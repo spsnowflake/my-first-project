@@ -12,6 +12,7 @@ import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import dotenv from 'dotenv'
+import cors from 'cors'
 import express from 'express'
 import { formatUnits, isAddress } from 'viem'
 
@@ -26,6 +27,19 @@ const SCAN_INTERVAL_MS = Number(process.env.SCAN_INTERVAL_MS ?? 30_000)
 const TOKEN_DECIMALS = Number(process.env.TOKEN_DECIMALS ?? 18)
 
 const app = express()
+
+const corsOrigins = (
+  process.env.CORS_ORIGIN ?? 'http://localhost:5173,http://127.0.0.1:5173'
+)
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
+
+app.use(
+  cors({
+    origin: corsOrigins,
+  }),
+)
 
 app.get('/health', async (_req, res) => {
   try {

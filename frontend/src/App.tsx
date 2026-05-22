@@ -1,9 +1,10 @@
 import { useState, type CSSProperties } from 'react'
 import NftMarket from './NftMarket'
 import TokenBank from './TokenBank'
+import TransferHistory from './TransferHistory'
 
 function App() {
-  const [page, setPage] = useState<'nft' | 'bank'>('nft')
+  const [page, setPage] = useState<'nft' | 'bank' | 'transfers'>('nft')
 
   return (
     <>
@@ -30,8 +31,21 @@ function App() {
         >
           Token Bank
         </button>
+        <button
+          type="button"
+          onClick={() => setPage('transfers')}
+          style={navBtn(page === 'transfers')}
+        >
+          转账记录
+        </button>
       </nav>
-      {page === 'nft' ? <NftMarket /> : <TokenBank />}
+      {page === 'nft' ? (
+        <NftMarket />
+      ) : page === 'bank' ? (
+        <TokenBank />
+      ) : (
+        <TransferHistory />
+      )}
     </>
   )
 }
