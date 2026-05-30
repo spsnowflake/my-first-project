@@ -29,20 +29,20 @@ contract Meme is Initializable {
     }
 
     function initialize(
-        string memory _name,    // 代币名称
-        string memory _symbol,  // 代币符号
-        uint256 _totalSupply,  // 总发行量（最大发行量）
-        uint256 _perMintAmount,  // 每次铸造数量
-        uint256 _mintPrice,  // 每个 Token 的铸造价格（wei 计价）
-        address _issuer  // Meme 发行者地址，用于收取 99% 费用 
+        string memory name_,
+        string memory symbol_,
+        uint256 totalSupply_,
+        uint256 perMintAmount_,
+        uint256 mintPrice_,
+        address issuer_
     ) external initializer {
-       name = _name;
-       symbol = _symbol;
-       totalSupplyLimit = _totalSupply;
-       perMintAmount = _perMintAmount;
-       mintPrice = _mintPrice;
-       issuer = _issuer;
-       factory = msg.sender;
+        name = name_;
+        symbol = symbol_;
+        totalSupplyLimit = totalSupply_;
+        perMintAmount = perMintAmount_;
+        mintPrice = mintPrice_;
+        issuer = issuer_;
+        factory = msg.sender;
     }
 
 

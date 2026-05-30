@@ -87,14 +87,4 @@ contract MemeFactoryContract {
     }
 
 
-
-
-
-
-
-
-
-
-
-
 }
