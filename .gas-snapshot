@@ -1,0 +1,3 @@
+NFTMarketT2Test:test_permitDeposit() (gas: 420012)
+NFTMarketTest:test_buyNFT() (gas: 666028)
+NFTMarketTest:test_list() (gas: 240047)

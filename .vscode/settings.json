@@ -1,0 +1,17 @@
+{
+  // Foundry 官方推荐：Solidity 语言服务与 forge 对齐
+  "[solidity]": {
+    "editor.defaultFormatter": "NomicFoundation.hardhat-solidity",
+    "editor.formatOnSave": true
+  },
+  "solidity.formatter": "forge",
+  "solidity.packageDefaultDependenciesContractsDirectory": "src",
+  "solidity.packageDefaultDependenciesDirectory": "lib",
+
+  // 减少 WSL 下文件变更后 LSP 刷新延迟
+  "files.watcherExclude": {
+    "**/out/**": true,
+    "**/cache/**": true,
+    "**/lib/**": true
+  }
+}

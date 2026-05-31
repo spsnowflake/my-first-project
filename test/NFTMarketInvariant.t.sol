@@ -55,7 +55,7 @@ contract NFTMarketHandler is Test {
         erc721.mint(seller, tokenId);
         erc721.approve(address(market), tokenId);
         // 用 try/catch 防止某次随机调用 revert 后中断整轮 invariant 测试
-        try market.list(tokenId, price) returns (bool ok) {
+        try market.list(tokenId, uint96(price)) returns (bool ok) {
             if (ok) {
                 listedTokenIds.push(tokenId);
             }
@@ -72,14 +72,14 @@ contract NFTMarketHandler is Test {
 
         uint256 pick = indexSeed % listedTokenIds.length;
         uint256 tokenId = listedTokenIds[pick];
-        uint256 price = market.tokenPrice(tokenId);
+        (uint96 price, address seller) = market.tokenListing(tokenId);
         // 如果该 token 在 market 状态里已不在售，清理本地列表中的脏数据
         if (price == 0) {
             _removeListedAt(pick);
             return;
         }
-
-        address seller = market.tokenSeller(tokenId);
+        // address seller = market.tokenListing(tokenId).seller;
+        // address seller = market.tokenSeller(tokenId);
         address buyer = (buyerSeed % 2 == 0) ? buyerA : buyerB;
         // 避免买家和卖家是同一地址，减少无效场景
         if (buyer == seller) {
@@ -131,15 +131,7 @@ contract NFTMarketInvariantTest is Test {
         erc20.transfer(buyerA, 1_000_000e18);
         erc20.transfer(buyerB, 1_000_000e18);
 
-        handler = new NFTMarketHandler(
-            market,
-            erc20,
-            erc721,
-            sellerA,
-            sellerB,
-            buyerA,
-            buyerB
-        );
+        handler = new NFTMarketHandler(market, erc20, erc721, sellerA, sellerB, buyerA, buyerB);
 
         // 告诉 Foundry：随机调用入口来自 handler
         targetContract(address(handler));
