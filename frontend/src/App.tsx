@@ -1,9 +1,12 @@
 import { useState, type CSSProperties } from 'react'
 import NftMarket from './NftMarket'
 import TokenBank from './TokenBank'
+import EsRNTLocksReader from './components/EsRNTLocksReader'
+
+
 
 function App() {
-  const [page, setPage] = useState<'nft' | 'bank'>('nft')
+  const [page, setPage] = useState<'nft' | 'bank' | 'esrnt'>('esrnt')
 
   return (
     <>
@@ -30,8 +33,17 @@ function App() {
         >
           Token Bank
         </button>
+        <button
+          type="button"
+          onClick={() => setPage('esrnt')}
+          style={navBtn(page === 'esrnt')}
+        >
+          esRNT Storage
+        </button>
       </nav>
-      {page === 'nft' ? <NftMarket /> : <TokenBank />}
+      {page === 'nft' && <NftMarket />}
+      {page === 'bank' && <TokenBank />}
+      {page === 'esrnt' && <EsRNTLocksReader />}
     </>
   )
 }
