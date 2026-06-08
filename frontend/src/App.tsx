@@ -2,11 +2,10 @@ import { useState, type CSSProperties } from 'react'
 import NftMarket from './NftMarket'
 import TokenBank from './TokenBank'
 import EsRNTLocksReader from './components/EsRNTLocksReader'
-
-
+import AirdropMerkleMarketPage from './AirdropMerkleMarket'
 
 function App() {
-  const [page, setPage] = useState<'nft' | 'bank' | 'esrnt'>('esrnt')
+  const [page, setPage] = useState<'nft' | 'bank' | 'esrnt' | 'merkle'>('esrnt')
 
   return (
     <>
@@ -40,10 +39,18 @@ function App() {
         >
           esRNT Storage
         </button>
+        <button
+          type="button"
+          onClick={() => setPage('merkle')}
+          style={navBtn(page === 'merkle')}
+        >
+          Merkle 白名单市场
+        </button>
       </nav>
       {page === 'nft' && <NftMarket />}
       {page === 'bank' && <TokenBank />}
       {page === 'esrnt' && <EsRNTLocksReader />}
+      {page === 'merkle' && <AirdropMerkleMarketPage />}
     </>
   )
 }

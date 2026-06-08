@@ -1,0 +1,19 @@
+out/
+cache/
+broadcast/
+node_modules/
+coverage/
+dist/
+artifacts/
+
+lib/forge-std/lib/
+lib/openzeppelin-contracts/docs/
+
+# Rust
+target/
+
+# Git
+.git/
+
+# Environment
+.env

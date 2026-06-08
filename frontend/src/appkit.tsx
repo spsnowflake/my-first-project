@@ -5,6 +5,7 @@ import { foundry, mainnet, sepolia } from '@reown/appkit/networks'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 import { WagmiProvider } from 'wagmi'
 import type { ReactNode } from 'react'
+import { getAnvilRpcUrl } from './lib/anvilRpc'
 
 const projectId = import.meta.env.VITE_PROJECT_ID
 if (!projectId) {
@@ -20,7 +21,20 @@ const metadata = {
   icons: ['https://avatars.githubusercontent.com/u/179229932'],
 }
 
-const networks: [AppKitNetwork, ...AppKitNetwork[]] = [foundry, mainnet, sepolia]
+/** Foundry 本地链：RPC 指向 Vite 代理 /rpc-anvil → 127.0.0.1:8545 */
+const localFoundry: AppKitNetwork = {
+  ...foundry,
+  rpcUrls: {
+    ...foundry.rpcUrls,
+    default: { http: [getAnvilRpcUrl()] },
+  },
+}
+
+const networks: [AppKitNetwork, ...AppKitNetwork[]] = [
+  localFoundry,
+  mainnet,
+  sepolia,
+]
 
 const wagmiAdapter = new WagmiAdapter({
   networks,

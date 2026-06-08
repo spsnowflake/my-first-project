@@ -1,9 +1,11 @@
 {
   "scripts": {
     "local": "bash scripts/start-local.sh",
-    "local:fe": "bash scripts/start-local.sh --with-fe"
+    "local:fe": "bash scripts/start-local.sh --with-fe",
+    "generate-whitelist": "node scripts/generate-whitelist.mjs"
   },
   "dependencies": {
+    "@openzeppelin/merkle-tree": "^1.0.8",
     "viem": "^2.48.11"
   }
 }
