@@ -4,16 +4,18 @@ pragma solidity ^0.8.0;
 import "src/IERC20Interface.sol";
 import "src/IERC721Interface.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+// UUPSUpgradeable
+// import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
 
-contract NFTMarket{
+contract NFTMarketV2 is Initializable, OwnableUpgradeable {
 
-    // IERC20 public erc20Token;
-    // IERC721 public erc721Token;
-    // address owner;
-    IERC20 public immutable erc20Token;
-    IERC721 public immutable erc721Token;
-    address public immutable owner;
 
+    IERC20 public erc20Token;
+    IERC721 public erc721Token;
+    bytes32 private constant IMPLEMENTATION_SLOT = bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1);
     event List(uint tokenId,address sellPeople,uint amount);
     event BuyNFT(address buyer,uint tokenId,uint amount);
     /// @notice ERC20 通过 tokensReceived 回调成交时触发（与直接 buyNFT 区分，便于链下监听）
@@ -26,29 +28,87 @@ contract NFTMarket{
     }                   // 合计 32 bytes，刚好一个 slot
     mapping(uint => Listing) public tokenListing;
 
-    // mapping (uint =>uint)public tokenPrice;
-    // mapping (uint => address)public tokenSeller;
     mapping (uint => uint) public buyNonces;
 
-    bytes32 public immutable DOMAIN_SEPARATOR;
+    bytes32 public DOMAIN_SEPARATOR_BUYNFT;
+    bytes32 public DOMAIN_SEPARATOR_LISTNFT;
+    mapping ( address =>uint ) public listNonces;
+    event permitList(uint tokenId,address sellPeople,uint amount);
 
-     constructor(IERC20 erc20,IERC721 erc721){
-         erc20Token = erc20;
-         erc721Token = erc721;
-         owner = msg.sender;
+     constructor(){
+        _disableInitializers();
+     }
 
-         DOMAIN_SEPARATOR = keccak256(
+    function initializeV2() external reinitializer(2) {
+        DOMAIN_SEPARATOR_LISTNFT = keccak256(
              abi.encode(
                  keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                 keccak256(bytes("NFTMarket")),
+                 keccak256(bytes("NFTMarketV2")),
                  keccak256(bytes("1")),
                  block.chainid,
                  address(this)
              )
          );
-     }
+    }
 
-    // 白名单用户离线签名，项目方来操作购买NFT
+    function upgradeTo(address newImplementation) external onlyOwner {
+        require(newImplementation != address(0), "ERC721V1: new implementation is the zero address");
+        require(
+            newImplementation != address(this), "ERC721V1: new implementation is the same as the current implementation"
+        );
+        _setImplementation(newImplementation);
+    }
+
+    function _setImplementation(address newImplementation) internal {
+        require(newImplementation.code.length > 0, "implementation is not contract");
+        StorageSlot.getAddressSlot(IMPLEMENTATION_SLOT).value = newImplementation;
+    }
+
+    // function _getImplementation() internal view returns (address) {
+    //     return StorageSlot.getAddressSlot(IMPLEMENTATION_SLOT).value;
+    // }
+
+
+    // 用户离线签名后,任何人都可以上架NFT
+    function permitListNFT(uint tokenId,address seller,uint96 amount,uint nonce,uint deadline,uint8 v,bytes32 r,bytes32 s)external returns (bool){
+        require(deadline >= block.timestamp,"deadline is in the past");
+        require(nonce == listNonces[seller],"nonce is not correct");
+        require(tokenId!=0 && amount >0,"tokenId must !=0, amount must >0");
+        require(erc721Token.ownerOf(tokenId)==seller,"you are not owner");
+        require(tokenListing[tokenId].price == 0, "already listed");
+        require(erc721Token.getApproved(tokenId) == address(this) ||erc721Token.isApprovedForAll(seller, address(this)),"NFTMarket: not approved");
+
+        // require(seller == msg.sender,"seller is not correct");
+
+        bytes32 hashStruct = keccak256(abi.encode(
+            keccak256("permitListNFT(uint tokenId,address seller,uint96 amount,uint nonce,uint deadline)"),
+            tokenId,
+            seller,
+            amount,
+            nonce,
+            deadline
+        ));
+        bytes32 hash = keccak256(abi.encodePacked(
+            "\x19\x01",
+            DOMAIN_SEPARATOR_LISTNFT,
+            hashStruct
+        ));
+        address signer = ECDSA.recover(hash, v, r, s);
+        require(signer == seller,"invalid signer");
+        listNonces[seller]++;
+
+        // 验证授权
+        tokenListing[tokenId] = Listing({
+            price: amount,
+            seller: seller
+        });
+        emit permitList(tokenId,seller, amount);
+        return true;
+    
+    }
+
+
+    // 项目方离线签名，用户来操作购买NFT
     function permitBuyNFT(uint tokenId,address buyer,uint amount,uint nonce,uint deadline,uint8 v,bytes32 r,bytes32 s)external{
         require(deadline >= block.timestamp,"deadline is in the past");
         require(nonce == buyNonces[tokenId],"nonce is not correct");
@@ -64,18 +124,18 @@ contract NFTMarket{
         ));
         bytes32 hash = keccak256(abi.encodePacked(
             "\x19\x01",
-            DOMAIN_SEPARATOR,
+            DOMAIN_SEPARATOR_BUYNFT,
             hashStruct
         ));
         address signer = ECDSA.recover(hash, v, r, s);
-        require(signer == owner,"invalid signer");
+        require(signer == owner(),"invalid signer");
         buyNonces[tokenId]++;
         buyNFT(tokenId,amount);
     
     }
 
     // 上架 NFT
-     function list(uint tokenId,uint96 amount) external  returns (bool){
+     function list(uint tokenId,uint96 amount) public  returns (bool){
         require(tokenId!=0 && amount >0,"tokenId must !=0, amount must >0");
         require(erc721Token.ownerOf(tokenId)==msg.sender,"you are not owner");
         require(tokenListing[tokenId].price == 0, "already listed");

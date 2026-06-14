@@ -4,16 +4,17 @@ pragma solidity ^0.8.0;
 import "src/IERC20Interface.sol";
 import "src/IERC721Interface.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+// UUPSUpgradeable
+// import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
 
-contract NFTMarket{
+contract NFTMarketV1 is Initializable, OwnableUpgradeable {
 
-    // IERC20 public erc20Token;
-    // IERC721 public erc721Token;
-    // address owner;
-    IERC20 public immutable erc20Token;
-    IERC721 public immutable erc721Token;
-    address public immutable owner;
-
+    IERC20 public erc20Token;
+    IERC721 public erc721Token;
+    bytes32 private constant IMPLEMENTATION_SLOT = bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1);
     event List(uint tokenId,address sellPeople,uint amount);
     event BuyNFT(address buyer,uint tokenId,uint amount);
     /// @notice ERC20 通过 tokensReceived 回调成交时触发（与直接 buyNFT 区分，便于链下监听）
@@ -30,25 +31,50 @@ contract NFTMarket{
     // mapping (uint => address)public tokenSeller;
     mapping (uint => uint) public buyNonces;
 
-    bytes32 public immutable DOMAIN_SEPARATOR;
+    bytes32 public DOMAIN_SEPARATOR_BUYNFT;
+    // bytes32 public DOMAIN_SEPARATOR_LISTNFT;
 
-     constructor(IERC20 erc20,IERC721 erc721){
-         erc20Token = erc20;
-         erc721Token = erc721;
-         owner = msg.sender;
+     constructor(){
+        _disableInitializers();
+     }
 
-         DOMAIN_SEPARATOR = keccak256(
+    function initialize(IERC20 erc20,IERC721 erc721) external initializer {
+        erc20Token = erc20;
+        erc721Token = erc721;
+        __Ownable_init(msg.sender);
+
+        DOMAIN_SEPARATOR_BUYNFT = keccak256(
              abi.encode(
                  keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                 keccak256(bytes("NFTMarket")),
+                 keccak256(bytes("NFTMarketV1")),
                  keccak256(bytes("1")),
                  block.chainid,
                  address(this)
              )
          );
-     }
+    }
 
-    // 白名单用户离线签名，项目方来操作购买NFT
+//  升级合约
+    function upgradeTo(address newImplementation) external onlyOwner {
+        require(newImplementation != address(0), "ERC721V1: new implementation is the zero address");
+        require(
+            newImplementation != address(this), "ERC721V1: new implementation is the same as the current implementation"
+        );
+        _setImplementation(newImplementation);
+    }
+
+    function _setImplementation(address newImplementation) internal {
+        require(newImplementation.code.length > 0, "implementation is not contract");
+        StorageSlot.getAddressSlot(IMPLEMENTATION_SLOT).value = newImplementation;
+    }
+
+    // function _getImplementation() internal view returns (address) {
+    //     return StorageSlot.getAddressSlot(IMPLEMENTATION_SLOT).value;
+    // }
+
+
+
+    // 项目方离线签名，用户来操作购买NFT
     function permitBuyNFT(uint tokenId,address buyer,uint amount,uint nonce,uint deadline,uint8 v,bytes32 r,bytes32 s)external{
         require(deadline >= block.timestamp,"deadline is in the past");
         require(nonce == buyNonces[tokenId],"nonce is not correct");
@@ -64,11 +90,11 @@ contract NFTMarket{
         ));
         bytes32 hash = keccak256(abi.encodePacked(
             "\x19\x01",
-            DOMAIN_SEPARATOR,
+            DOMAIN_SEPARATOR_BUYNFT,
             hashStruct
         ));
         address signer = ECDSA.recover(hash, v, r, s);
-        require(signer == owner,"invalid signer");
+        require(signer == owner(),"invalid signer");
         buyNonces[tokenId]++;
         buyNFT(tokenId,amount);
     
