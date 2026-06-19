@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 // import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
 
-contract ERC721V1 is Initializable {
+contract ERC721V1_1 is Initializable {
     using Strings for uint256;
     using Address for address;
 

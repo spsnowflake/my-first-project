@@ -1,66 +1,15 @@
-## Foundry
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
 
-Foundry consists of:
+测试网：
 
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+ERC20:0xddBC57955E526909EEe3F8dEfa714547F7258b22
 
-## Documentation
 
-https://book.getfoundry.sh/
+ERC721：
+Proxy 地址（用户 mint/transfer 用这个）: 0x5A62833244Da2e17c783b35BF40E5fC970004e8f
+ERC721V1 Implementation : 0xd2e86DBCc84F6028c1E77feA57B4f2D8a57c6679
 
-## Usage
-
-### Build
-
-```shell
-$ forge build
-```
-
-### Test
-
-```shell
-$ forge test
-```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+Market：
+Proxy 地址（用户 list/buy 用这个）: 0x785581098f0872fC677954b0D69bC994bac0EE94
+NFTMarketV1 Implementation: 0x8DBEbCC4E8EC234a4678B2C10Bc08238532A7f7A
+NFTMarketV2 Implementation（升级后）: 0x05bb342996918433b1Bde4a53b910e90e193CfE8

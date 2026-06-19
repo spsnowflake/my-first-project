@@ -39,6 +39,7 @@ contract NFTMarketV2 is Initializable, OwnableUpgradeable {
         _disableInitializers();
      }
 
+// 初始化合约
     function initializeV2() external reinitializer(2) {
         DOMAIN_SEPARATOR_LISTNFT = keccak256(
              abi.encode(
@@ -51,6 +52,8 @@ contract NFTMarketV2 is Initializable, OwnableUpgradeable {
          );
     }
 
+// 
+// 升级合约
     function upgradeTo(address newImplementation) external onlyOwner {
         require(newImplementation != address(0), "ERC721V1: new implementation is the zero address");
         require(

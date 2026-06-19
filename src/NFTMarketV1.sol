@@ -38,6 +38,7 @@ contract NFTMarketV1 is Initializable, OwnableUpgradeable {
         _disableInitializers();
      }
 
+// 初始化合约
     function initialize(IERC20 erc20,IERC721 erc721) external initializer {
         erc20Token = erc20;
         erc721Token = erc721;
