@@ -108,8 +108,8 @@ contract MemeFactoryContractV2 {
         (uint256 realAmountToken, uint256 realAmountETH, uint256 liquidity) = IUniswapV2Router02(uniswapV2Router).addLiquidityETH{value: projectFee}(
             address(token),
             tokenAmount,
-            tokenAmount*95/100,
-            projectFee*95/100,
+            tokenAmount*30/100,
+            projectFee*30/100,
             address(this),
             block.timestamp+600 // 600秒后过期
         );
@@ -170,6 +170,8 @@ contract MemeFactoryContractV2 {
         }
         emit BuyMeme(tokenAddr, msg.sender, amountToken, realCostAmountETH);
     }
+
+    receive() external payable {}
 
 
 
