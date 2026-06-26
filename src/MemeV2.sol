@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
-contract Meme is Initializable {
+contract MemeV2 is Initializable {
     
 
     string public name;                                               
@@ -13,7 +13,7 @@ contract Meme is Initializable {
     mapping(address => mapping(address => uint256)) public allowance;   // 授权额度
 
     address public factory;          // 工厂合约地址，用于 mint 权限校验 
-    address public issuer;           // Meme 发行者地址，用于收取 99% 费用 
+    address public issuer;           // Meme 发行者地址，用于收取 95% 费用 
     uint256 public totalSupplyLimit; // 总发行量上限     
     uint256 public perMintAmount;    // 每次铸造数量（token自身有精度，1e18）     
     uint256 public mintPrice;        // 每个 Token 的铸造价格（wei 计价，1e18）
@@ -45,6 +45,23 @@ contract Meme is Initializable {
         factory = msg.sender;
     }
 
+
+    /**
+     * @notice 铸造 Token给工厂，只有工厂合约可以调用。是铸造后转给工厂的代币，是工厂的流动性来源
+     * @dev 权限卡死在工厂，用户必须通过工厂的 mintMeme() 付费后才能触发
+     *      任何人直接调用此函数都会 revert，防止绕过付费逻辑免费铸币
+     * @param to 接收 Token 的地址
+     * @param amount 铸造数量
+     */
+    function mintToFactory(address to,uint256 amount) external {
+        require(msg.sender == factory, "Meme: only factory can mint");
+        require(totalSupply + amount <= totalSupplyLimit, "Meme: total supply limit reached");
+        require(address(to) != address(0), "Meme: cannot mint to zero address");
+
+        totalSupply += amount;
+        balanceOf[to] += amount;
+        emit Transfer(address(0), to, amount);
+    }
 
 
     /**
