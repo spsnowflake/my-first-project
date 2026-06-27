@@ -1,0 +1,8 @@
+No files changed, compilation skipped
+
+Ran 2 tests for test/LaunchPad.t.sol:LaunchPadTest
+[PASS] test_fork_usesOfficialSepoliaUniswap() (gas: 11807)
+[PASS] test_memeFactoryContract() (gas: 4242814)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.14s (1.67ms CPU time)
+
+Ran 1 test suite in 1.14s (1.14s CPU time): 2 tests passed, 0 failed, 0 skipped (2 total tests)

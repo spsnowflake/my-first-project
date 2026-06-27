@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import "./MemeV2.sol";
+import {IUniswapV2Factory} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
+import {IUniswapV2Pair} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 
 contract MemeFactoryContractV2 {
     // 合约母体地址，克隆合约专用
@@ -130,13 +132,18 @@ contract MemeFactoryContractV2 {
 
     }
 
-// 从池子中购买Token,token数量固定为 perMintAmount
-    function buyMeme(address tokenAddr) public payable {
+// 从池子中购买Token,token数量用户手动输入
+    function buyMeme(address tokenAddr,uint256 amountToken) public payable {
         require(msg.value > 0, "Amount must be greater than 0");
         require(tokenAddr!=address(0), "Token address cannot be 0");
         require(isMemeToken[tokenAddr], "Token is not deployed by this factory");
         MemeV2 token = MemeV2(tokenAddr);
-        uint256 amountToken = token.perMintAmount();
+        // uint256 amountToken = token.perMintAmount();
+
+        // 获取池子中token的储备量，如果储备量小于用户输入的token数量，则不允许购买
+        (uint256 tokenReserve,) = getPoolTokenReserve(tokenAddr);
+        require(tokenReserve > 0, "Token reserve is 0");
+        require(amountToken <= tokenReserve, "Amount token is greater than token reserve");
 
 
 // 计算从池子中购买 amountToken 个 Token 需要支付的ETH数量
@@ -171,7 +178,31 @@ contract MemeFactoryContractV2 {
         emit BuyMeme(tokenAddr, msg.sender, amountToken, realCostAmountETH);
     }
 
+
+// 获取池子中token和eth的储备量
+    function getPoolTokenReserve(address tokenAddr) public view returns (uint256 tokenReserve, uint256 ethReserve) {
+        address weth = uniswapV2Router.WETH();
+        address factory = uniswapV2Router.factory();
+
+        address pair = IUniswapV2Factory(factory).getPair(tokenAddr, weth);
+        require(pair != address(0), "pair not exists");
+
+        (uint112 reserve0, uint112 reserve1,) = IUniswapV2Pair(pair).getReserves();
+
+        address token0 = IUniswapV2Pair(pair).token0();
+
+        if (token0 == tokenAddr) {
+            tokenReserve = reserve0;
+            ethReserve   = reserve1;
+        } else {
+            tokenReserve = reserve1;
+            ethReserve   = reserve0;
+        }
+    }
+
     receive() external payable {}
+
+    fallback() external payable {}
 
 
 
