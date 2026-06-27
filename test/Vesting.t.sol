@@ -43,11 +43,20 @@ contract VestingTest is Test {
         vm.expectRevert("Cliff not reached");
         vesting.release();
 
-        vm.warp(block.timestamp + 365 days + 30 days);
+// 差一天
+        vm.warp(block.timestamp + 365 days + 29 days);
+        vm.expectRevert("No release count");
+        vesting.release();
+
+        vm.warp(block.timestamp + 1 days);
         bool result3 = vesting.release();
         assertEq(result3, true);
         assertEq(vesting.releasedAmount(),  1000000e18 / uint256(24));
         assertEq(vesting.releaseCount(), 1);
+
+// 重复释放，预期报错
+        vm.expectRevert("No release count");
+        vesting.release();
 
 
         vm.warp(block.timestamp + 30 days);
