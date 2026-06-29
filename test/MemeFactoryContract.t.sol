@@ -62,7 +62,7 @@ contract MemeFactoryContractTest is Test {
 
 // 2、测试一次铸造的数量是否正确，3、余额是否正确
         vm.startPrank(buyer);
-        uint256 buyerBeforeBalance = buyer.balance;
+        // uint256 buyerBeforeBalance = buyer.balance;
         uint256 user1BeforeBalance = user1.balance;
         uint256 user2BeforeBalance = user2.balance;
         uint256 totalCost = 1 ether * 100e18 / 1e18; 
