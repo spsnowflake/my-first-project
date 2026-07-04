@@ -6,6 +6,7 @@ import {MyToken} from "../src/MyToken.sol";
 
 contract MyTokenScript is Script {
     MyToken public myToken;
+    MyToken public myToken2;
 
     function setUp() public {}
     

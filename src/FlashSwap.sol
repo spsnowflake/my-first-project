@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {IUniswapV2Callee} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Callee.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import {IUniswapV2Pair} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
-import {UniswapV2Library} from "@uniswap/v2-periphery/contracts/libraries/UniswapV2Library.sol";
+import {UniswapV2Library} from "./libraries/UniswapV2Library.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract FlashSwap is IUniswapV2Callee {
@@ -12,6 +12,13 @@ contract FlashSwap is IUniswapV2Callee {
     address public immutable factory;
     address public immutable router2;
     address public immutable owner;
+
+// 借钱事件
+    event Borrow(address indexed sender,address indexed pair,address indexed borrowToken,uint amount);
+    // 还款事件
+    event Repay(address indexed sender,address indexed pair,address indexed borrowToken,uint amount);
+    // 获利事件
+    event Profit(address indexed sender,address indexed pair,address indexed profitToken,uint amount);
 
     constructor(address _factory,address _router2) {
         factory = _factory;
@@ -29,10 +36,13 @@ contract FlashSwap is IUniswapV2Callee {
 
         address token0 = IUniswapV2Pair(pair).token0();
         if (token0 == borrowToken) {
-            IUniswapV2Pair(router2).swap(amount,0,address(this),new bytes(0x11));
+            IUniswapV2Pair(pair).swap(amount,0,address(this),new bytes(0x11));
         }else {
-            IUniswapV2Pair(router2).swap(0,amount,address(this),new bytes(0x11));
+            IUniswapV2Pair(pair).swap(0,amount,address(this),new bytes(0x11));
         }
+        // 触发借钱事件
+        emit Borrow(msg.sender,pair,borrowToken,amount);
+
 
     }
 
@@ -63,7 +73,7 @@ contract FlashSwap is IUniswapV2Callee {
             IERC20(token0).approve(router2,amountReadyToekn1*2);
             path[0] = token0;
             path[1] = token1;
-            uint[] memory amountsOut = IUniswapV2Router02(router2).swapExactTokensForTokens(balance0,0,path,address(this),block.timestamp+60);
+            uint[] memory amountsOut = IUniswapV2Router02(router2).swapExactTokensForTokens(balance0,0,path,address(this),block.timestamp+600);
 
             // 换出来的token1数量
             uint amountToken1 = amountsOut[1];
@@ -75,10 +85,15 @@ contract FlashSwap is IUniswapV2Callee {
             bool success = IERC20(token1).transfer(msg.sender,amountReadyToekn1);
             // 还款失败
             require(success,"Repay failed");
+            // 触发还款事件
+            emit Repay(address(this),msg.sender,token1,amountReadyToekn1);
 
             // 获利
             uint profit = amountToken1 - amountReadyToekn1;
             IERC20(token1).transfer(owner,profit);
+            // 触发获利事件
+            emit Profit(owner,msg.sender,token1,profit);
+
         }
 
         // 如果收到token1，则兑换token0
@@ -95,7 +110,7 @@ contract FlashSwap is IUniswapV2Callee {
             IERC20(token1).approve(router2,amountReadyToekn0*2);
             path[0] = token1;
             path[1] = token0;
-            uint[] memory amountsOut = IUniswapV2Router02(router2).swapExactTokensForTokens(balance1,0,path,address(this),block.timestamp+60);
+            uint[] memory amountsOut = IUniswapV2Router02(router2).swapExactTokensForTokens(balance1,0,path,address(this),block.timestamp+600);
 
             // 换出来的token0数量
             uint amountToken0 = amountsOut[1];
@@ -107,21 +122,17 @@ contract FlashSwap is IUniswapV2Callee {
             bool success = IERC20(token0).transfer(msg.sender,amountReadyToekn0);
             // 还款失败
             require(success,"Repay failed");
+            // 触发还款事件
+            emit Repay(address(this),msg.sender,token0,amountReadyToekn0);
 
             // 获利
             uint profit = amountToken0 - amountReadyToekn0;
             IERC20(token0).transfer(owner,profit);
-            
+            // 触发获利事件
+            emit Profit(owner,msg.sender,token0,profit);
         }
 
     }
-
-
-
-
-
-
-
 }
 
 
