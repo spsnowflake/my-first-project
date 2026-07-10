@@ -38,6 +38,8 @@ contract LaunchPadTWAP {
         require(pair != address(0), "pair not exists");
         (uint112 r0, uint112 r1,) = IUniswapV2Pair(pair).getReserves();
         require(r0 > 0 && r1 > 0, "no liquidity in pair");
+        // 直接更新一次TWAP价格
+        update();
     }
 
 // 更新TWAP价格

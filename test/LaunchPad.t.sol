@@ -99,7 +99,7 @@ contract LaunchPadTest is Test {
 
 
 
-//      计算从池子中购买 100e18 个 Token 需要支付的ETH数量
+//      计算从池子中购买 3e18 个 Token 需要支付的ETH数量
         {
         address[] memory path = new address[](2);
         path[0] = address(router.WETH());
