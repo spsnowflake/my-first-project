@@ -11,7 +11,7 @@ import {console2} from "../lib/forge-std/src/console2.sol";
 contract LaunchPadTwapTest is Test {
     address internal constant SEPOLIA_UNISWAP_FACTORY = 0xF62c03E08ada871A0bEb309762E260a7a6a880E6;
     address internal constant SEPOLIA_UNISWAP_ROUTER = 0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3;
-    uint256 internal constant SEPOLIA_FORK_BLOCK = 11201900;
+    uint256 internal constant SEPOLIA_FORK_BLOCK = 11254460;
 
     MemeFactoryContractV2 public memeFactoryContract;
     IUniswapV2Router02 public router;
@@ -58,12 +58,17 @@ contract LaunchPadTwapTest is Test {
         LaunchPadTWAP twap = new LaunchPadTWAP(memeFactoryContract, address(memeToken));
         vm.warp(block.timestamp + 13 hours);
         twap.update();
+        // 5 token : 5 ETH  = 1 ETH/token 
         assertEq(twap.getTwapPrice(), 1 ether);
 
+// 未满PERIOD时间，再次update应revert
+        vm.expectRevert("timeElapsed < PERIOD");
+        twap.update();
 
         memeFactoryContract.mintMeme{value: 100 ether}(tokenAddr);
         vm.warp(block.timestamp + 12 hours + 12 hours);
         twap.update();
+        // 10 token : 10 ETH  = 1 ETH/token 
         assertEq(twap.getTwapPrice(), 1 ether);
         vm.stopPrank();
 
@@ -74,39 +79,48 @@ contract LaunchPadTwapTest is Test {
 
         address[] memory sellPath = new address[](2);
         sellPath[0] = tokenAddr;
-        sellPath[1] = router.WETH();   
+        sellPath[1] = router.WETH();
 
         vm.startPrank(seller);
         memeToken.approve(address(router), 100e18);
-        router.swapExactTokensForETH(
-            100e18,
-            0,             
-            sellPath,
-            seller,
-            block.timestamp + 600
-        );
+        router.swapExactTokensForETH(100e18, 0, sellPath, seller, block.timestamp + 600);
+        vm.warp(block.timestamp + 12 hours + 12 hours + 13 hours);
+        twap.update();
+        // 大量卖出后，此时应该小于 1 ETH/token
+        assertLt(twap.getTwapPrice(), 1 ether);
         vm.stopPrank();
 
-        uint256 buyAmount = 1e18;  // 买 10 个 token
-        uint256 mintCost = 1 ether; // mint 价 1 ETH/token
+        uint256 priceLow = _spotPrice(tokenAddr);
 
-        address[] memory buyPath = new address[](2);
-        buyPath[0] = router.WETH();
-        buyPath[1] = tokenAddr;
-
-        uint256 uniCost = router.getAmountsIn(buyAmount, buyPath)[0];
-        console2.log("uniCost", uniCost);
-
-        vm.warp(block.timestamp + 12 hours + 12 hours +12 hours);
-        twap.update();
-        assertEq(twap.getTwapPrice(), uniCost);
+        // 低价维持 12h
+        vm.warp(block.timestamp + 12 hours + 12 hours + 13 hours + 12 hours);
 
 
-        // 必须满足池子价格低于铸造价格
-        assertLt(uniCost, mintCost);
+        // 买入抬价
+        vm.prank(buyer);
+        memeFactoryContract.buyMeme{value: 50 ether}(tokenAddr, 1e18);
+        uint256 priceMid = _spotPrice(tokenAddr);
 
-        // memeFactoryContract.mintMeme{value: 100 ether}(tokenAddr);
-        // memeFactoryContract.mintMeme{value: 100 ether}(tokenAddr);
-        // memeFactoryContract.mintMeme{value: 100 ether}(tokenAddr);
+        // 中价再维持 12h，然后 update：窗口 = 12h low + 12h mid
+        vm.warp(block.timestamp + 12 hours + 12 hours + 13 hours + 12 hours + 12 hours);
+
+        uint256 twapPrice = twap.update();
+        uint256 expected = (priceLow * 12 hours + priceMid * 12 hours) / (12 hours + 12 hours);
+
+        // 与手算加权平均对比（允许误差）
+        assertApproxEqAbs(twapPrice, expected, 1e14);
+        // TWAP 应落在两段价格之间
+        assertGt(twapPrice, priceLow);
+        assertLt(twapPrice, priceMid);
+
+
+    }
+
+
+
+    /// @dev 当前池子价（ETH/token），与 TWAP 同源：ethReserve / tokenReserve，不含 0.3% 手续费
+    function _spotPrice(address tokenAddr) internal view returns (uint256) {
+        (uint256 tokenReserve, uint256 ethReserve) = memeFactoryContract.getPoolTokenReserve(tokenAddr);
+        return ethReserve * 1e18 / tokenReserve;
     }
 }
