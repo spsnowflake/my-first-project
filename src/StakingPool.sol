@@ -2,10 +2,11 @@
 pragma solidity ^0.8.0;
 
 import {KKToken} from "./KKToken.sol";
+import {IStaking} from "./IStaking.sol";
 
 
 
-contract StakingPool {
+contract StakingPool is IStaking{
 
     KKToken public immutable kkToken;
     uint256 public constant BONUS_MULTIPLIER = 10*1e18;
@@ -19,11 +20,6 @@ contract StakingPool {
 
 // 每个eth可以拿到多少kkToken，带有1e12小数精度
     uint256 public accKKPerShare;
-
-    // 总质押的kkToken数量
-    // uint256 public totalStakedKKToken;
-    // 总质押的eth数量
-    // uint256 public totalStakedETH;
 
     struct UserInfo {
         // 用户质押的eth
@@ -123,6 +119,7 @@ contract StakingPool {
     }
 
 
+// 更新池子状态
     function updatePool() public{
         if (block.number <= lastRewardBlock) return;
         if (totalEth == 0) {
