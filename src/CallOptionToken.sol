@@ -26,30 +26,51 @@ contract CallOptionToken is ERC20 {
 
     // uint256 public constant DECIMALS = 18;
     address public immutable owner;
+    bool private _initialized = false;
 
     constructor(uint256 _strikePrice,address _usdt,address _uniswapV2Router) ERC20("COToken", "COToken") {
         require(_strikePrice > 0, "Strike price must be greater than 0");
         require(_usdt != address(0), "Invalid usdt address");
         require(_uniswapV2Router != address(0), "Invalid uniswapV2Router address");
+        uniswapV2Router = IUniswapV2Router02(_uniswapV2Router);
+
+        owner = msg.sender;
         usdt = IERC20(_usdt);
 
-        uniswapV2Router = IUniswapV2Router02(_uniswapV2Router);
-        address weth = uniswapV2Router.WETH();
-        address factory = uniswapV2Router.factory();
-        address pair = IUniswapV2Factory(factory).getPair(weth, _usdt);
-        require(pair != address(0), "pair not exists");
-
-// TODO 添加流动性，比例未确认，还有 router的approve
-        uniswapV2Router.addLiquidityETH ( _usdt, 1000000000000000000, 0, 0, address(this), block.timestamp + 600 seconds);
-
-        (uint112 r0, uint112 r1,) = IUniswapV2Pair(pair).getReserves();
-        require(r0 > 0 && r1 > 0, "no liquidity in pair");
-        owner = msg.sender;
 // 行权价格
         strikePrice = _strikePrice*10**18;
         expiry = block.timestamp + 365 days;
 
     }
+
+// 初始化流动性
+    function initLiquidity() external onlyOwner {
+        require(!_initialized, "Already initialized");
+        _initialized = true;
+// 初始化router
+        address factory = uniswapV2Router.factory();
+
+        _mint(address(this), 50*1e18);
+        bool approveSuccess1 = approve(address(uniswapV2Router), 50*1e18);
+        require(approveSuccess1, "approveSuccess1 failed");
+        
+        // owner需要先approve usdt到合约账户
+        bool success = usdt.transferFrom(owner, address(this), 5000*1e18);
+        require(success, "Transfer usdt failed");
+
+        bool approveSuccess2 = usdt.approve(address(uniswapV2Router), 5000*1e18);
+        require(approveSuccess2, "approveSuccess2 failed");
+        address _usdt = address(usdt);
+
+// 初始化流动性
+        // (uint256 realAmountToken, uint256 realAmountETH, uint256 liquidity) = uniswapV2Router.addLiquidity ( _usdt,address(this), 5000*1e18, 50*1e18, 10*1e18, 1*1e17, address(this), block.timestamp + 600 seconds);
+        uniswapV2Router.addLiquidity( _usdt,address(this), 5000*1e18, 50*1e18, 10*1e18, 1*1e17, address(this), block.timestamp + 600 seconds);
+
+        address pair = IUniswapV2Factory(factory).getPair( _usdt,address(this));
+        require(pair != address(0), "pair not exists");
+        (uint112 r0, uint112 r1,) = IUniswapV2Pair(pair).getReserves();
+        require(r0 > 0 && r1 > 0, "no liquidity in pair");
+   }
 
 // 销毁期权 token,赎回标的资产
     function burnOption() external onlyOwner {
