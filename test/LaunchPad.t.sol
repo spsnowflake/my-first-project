@@ -11,7 +11,8 @@ import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUn
 contract LaunchPadTest is Test {
     address internal constant SEPOLIA_UNISWAP_FACTORY = 0xF62c03E08ada871A0bEb309762E260a7a6a880E6;
     address internal constant SEPOLIA_UNISWAP_ROUTER = 0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3;
-    uint256 internal constant SEPOLIA_FORK_BLOCK = 11149797;
+    uint256 internal constant SEPOLIA_FORK_BLOCK = 11383580;
+
 
     MemeFactoryContractV2 public memeFactoryContract;
     IUniswapV2Router02 public router;

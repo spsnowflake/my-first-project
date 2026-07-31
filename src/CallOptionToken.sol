@@ -44,27 +44,31 @@ contract CallOptionToken is ERC20 {
     }
 
 // 初始化流动性
-    function initLiquidity() external onlyOwner {
+    function initLiquidity() external payable onlyOwner {
         require(!_initialized, "Already initialized");
+        require(msg.value > 0, "Amount must be greater than 0");
         _initialized = true;
 // 初始化router
         address factory = uniswapV2Router.factory();
 
-        _mint(address(this), 50*1e18);
-        bool approveSuccess1 = approve(address(uniswapV2Router), 50*1e18);
-        require(approveSuccess1, "approveSuccess1 failed");
-        
+// 数量上 eth 和 cotoken 1:1
+        uint amountCOToken = msg.value;
+        uint amountUSDT = amountCOToken*100;
+        _mint(address(this), amountCOToken);
+        _approve(address(this), address(uniswapV2Router), amountCOToken);
+        // require(approveSuccess1, "approveSuccess1 failed");
+
         // owner需要先approve usdt到合约账户
-        bool success = usdt.transferFrom(owner, address(this), 5000*1e18);
+        bool success = usdt.transferFrom(owner, address(this), amountUSDT);
         require(success, "Transfer usdt failed");
 
-        bool approveSuccess2 = usdt.approve(address(uniswapV2Router), 5000*1e18);
+        bool approveSuccess2 = usdt.approve(address(uniswapV2Router), amountUSDT);
         require(approveSuccess2, "approveSuccess2 failed");
         address _usdt = address(usdt);
 
 // 初始化流动性
         // (uint256 realAmountToken, uint256 realAmountETH, uint256 liquidity) = uniswapV2Router.addLiquidity ( _usdt,address(this), 5000*1e18, 50*1e18, 10*1e18, 1*1e17, address(this), block.timestamp + 600 seconds);
-        uniswapV2Router.addLiquidity( _usdt,address(this), 5000*1e18, 50*1e18, 10*1e18, 1*1e17, address(this), block.timestamp + 600 seconds);
+        uniswapV2Router.addLiquidity( _usdt,address(this), amountUSDT, amountCOToken, 10*1e18, 1*1e17, address(this), block.timestamp + 600 seconds);
 
         address pair = IUniswapV2Factory(factory).getPair( _usdt,address(this));
         require(pair != address(0), "pair not exists");
@@ -84,9 +88,10 @@ contract CallOptionToken is ERC20 {
     function exerciseOption() external onlyAfterExpiry {
         require(balanceOf(msg.sender) > 0, "You don't have any option to exercise");
         uint balanceToken = balanceOf(msg.sender);
+        // 合约eth余额需要大于等于期权数量
         require(address(this).balance >= balanceToken, "Insufficient eth balance");
 
-        // 从用户账户中转移usdt到合约账户
+        // 从用户账户中转移usdt到合约账户。
         bool success = usdt.transferFrom(msg.sender, address(this), balanceToken*strikePrice / 1e18);
         require(success, "Transfer usdt failed");
         // 销毁期权 token
