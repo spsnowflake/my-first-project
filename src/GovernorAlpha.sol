@@ -152,6 +152,13 @@ contract GovernorAlpha {
         }
     }
 
+    ///  链上投票：msg.sender 对提案投赞成/反对票
+    /// @param proposalId 提案 ID
+    /// @param support true=赞成，false=反对
+    function castVote(uint proposalId, bool support) public {
+        return _castVote(msg.sender, proposalId, support);
+    }
+
         /// 计票核心：按提案 startBlock 的历史票数计票，并写入回执
     /// @dev 调用 Comp.getPriorVotes，防止提案后买票操纵
     function _castVote(address voter, uint proposalId, bool support) internal {

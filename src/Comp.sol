@@ -72,6 +72,7 @@ contract Comp {
         balances[from_address] = subUint(balances[from_address], amount, "Comp::_transferTokens: transfer amount exceeds balance");
         balances[to_address] = addUint(balances[to_address], amount, "Comp::_transferTokens: transfer amount overflows");
         emit Transfer(from_address, to_address, amount);
+        // 有委托关系时，移动投票权
         _moveDelegates(delegates[from_address], delegates[to_address], amount);
 
     }
@@ -82,7 +83,7 @@ contract Comp {
         if(nCheckpoints > 0 && checkpoints[delegatee][nCheckpoints - 1].fromBlock == block.number) {
             checkpoints[delegatee][nCheckpoints - 1].votes = newVotes;
         } else {
-            // 如果是第一次写入或者不是同一个区块，则创建新检查点
+            // 如果是第一次写入或者当前区块不是与最新区块不是同一个区块，则创建新检查点
             checkpoints[delegatee][nCheckpoints] = Checkpoint(block.number, newVotes);
             numCheckpoints[delegatee] = nCheckpoints + 1;
         }
@@ -113,7 +114,7 @@ contract Comp {
     // 内部委托逻辑：更新委托关系，并移动对应投票权
     function _delegate(address delegator, address delegatee) internal {
         address currentDelegate = delegates[delegator];
-        uint currentVotes = getCurrentVotes(delegator);
+        uint currentVotes = balances[delegator];
         delegates[delegator] = delegatee;
         _moveDelegates(currentDelegate, delegatee, currentVotes);
         emit DelegateChanged(delegator, currentDelegate, delegatee);

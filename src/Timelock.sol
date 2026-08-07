@@ -81,8 +81,6 @@ contract Timelock {
         return txHash;
     }
 
-
-
         ///  获取当前区块时间戳
     function getBlockTimestamp() internal view returns (uint) {
         return block.timestamp;
