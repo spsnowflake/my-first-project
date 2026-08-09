@@ -9,7 +9,8 @@
     "market-demo": "tsx index.ts market-demo",
     "listen": "tsx index.ts listen",
     "sync": "tsx transfer-indexer.ts",
-    "api": "tsx api-server.ts"
+    "api": "tsx api-server.ts",
+    "flashbots-presale": "tsx flashbots-presale-bundle.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
