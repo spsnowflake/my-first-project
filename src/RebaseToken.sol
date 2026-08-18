@@ -44,6 +44,7 @@ contract RebaseToken {
 
 // 获取总供应量
     function totalSupply() public view returns (uint256) {
+        
         return rebase();
     }
 

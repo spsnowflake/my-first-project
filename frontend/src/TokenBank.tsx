@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useAppKitAccount } from '@reown/appkit/react'
-import { isAddress, maxUint256, parseUnits, formatUnits } from 'viem'
+import { isAddress, maxUint256, parseUnits, formatUnits, type Hex } from 'viem'
 import {
   useChainId,
   useChains,
   usePublicClient,
   useReadContract,
+  useSendCalls,
   useWalletClient,
   useWriteContract,
 } from 'wagmi'
@@ -27,6 +28,16 @@ import {
 
 function isBankAddress(v: string | undefined): v is `0x${string}` {
   return Boolean(v && isAddress(v))
+}
+
+/** MetaMask 官方 EIP-7702 Delegator（各支持链上地址相同） */
+const MM_EIP7702_DELEGATOR =
+  '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B' as const
+
+function isMetaMask7702Delegated(code: Hex | undefined): boolean {
+  if (!code || code === '0x') return false
+  const expected = `0xef0100${MM_EIP7702_DELEGATOR.slice(2)}`.toLowerCase()
+  return code.toLowerCase() === expected
 }
 
 export default function TokenBank() {
@@ -148,6 +159,21 @@ export default function TokenBank() {
   const publicClient = usePublicClient()
   const { data: walletClient } = useWalletClient()
   const { writeContractAsync } = useWriteContract()
+  const { sendCallsAsync } = useSendCalls()
+  const [eoaCode, setEoaCode] = useState<Hex | undefined>()
+
+  const refreshEoaCode = useCallback(async () => {
+    if (!publicClient || !address || !isAddress(address)) {
+      setEoaCode(undefined)
+      return
+    }
+    const code = await publicClient.getCode({ address: address as `0x${string}` })
+    setEoaCode(code)
+  }, [publicClient, address])
+
+  useEffect(() => {
+    void refreshEoaCode()
+  }, [refreshEoaCode])
 
   useEffect(() => {
     if (address && !permitOwnerStr) {
@@ -239,6 +265,83 @@ export default function TokenBank() {
     refetchAllowance,
     refetchWallet,
     refetchBank,
+  ])
+
+  const doEip7702Deposit = useCallback(async () => {
+    if (!bankAddress || !token || !address || !publicClient || !walletClient) {
+      setError('请连接钱包，并确认已配置 TokenBank 与代币地址。')
+      return
+    }
+    if (!chain) {
+      setError('当前链未在 wagmi 配置中。请检查网络列表。')
+      return
+    }
+    if (chainId === 31337) {
+      setError('EIP-7702 请使用 Sepolia 等支持该能力的测试网，本地 Anvil 无法走 MetaMask 升级流程。')
+      return
+    }
+    if (!amountWei || amountWei <= 0n) {
+      setError('请在上方输入框填写有效存款金额。')
+      return
+    }
+    if (walletBalance !== undefined && amountWei > walletBalance) {
+      setError('钱包 TOKEN 余额不足')
+      return
+    }
+    setError(null)
+    setBusy(true)
+    const account = address as `0x${string}`
+    try {
+      const { id } = await sendCallsAsync({
+        account,
+        forceAtomic: true,
+        calls: [
+          {
+            to: token,
+            abi: erc20Abi,
+            functionName: 'approve',
+            args: [bankAddress, amountWei],
+          },
+          {
+            to: bankAddress,
+            abi: tokenBankAbi,
+            functionName: 'deposit',
+            args: [amountWei],
+          },
+        ],
+      })
+      const status = await walletClient.waitForCallsStatus({ id })
+      if (status.status === 'failure' || status.statusCode >= 400) {
+        throw new Error(
+          `EIP-7702 批量调用失败（status=${status.status ?? status.statusCode}）`,
+        )
+      }
+      await Promise.all([
+        refetchWallet(),
+        refetchBank(),
+        refetchAllowance(),
+        refreshEoaCode(),
+      ])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'EIP-7702 授权存款失败')
+    } finally {
+      setBusy(false)
+    }
+  }, [
+    bankAddress,
+    token,
+    address,
+    publicClient,
+    walletClient,
+    chain,
+    chainId,
+    amountWei,
+    walletBalance,
+    sendCallsAsync,
+    refetchWallet,
+    refetchBank,
+    refetchAllowance,
+    refreshEoaCode,
   ])
 
   const doWithdraw = useCallback(async () => {
@@ -572,6 +675,13 @@ export default function TokenBank() {
               当前钱包：{address}
               <br />
               代币合约：{token ?? '—'}
+              <br />
+              EIP-7702：
+              {!eoaCode || eoaCode === '0x'
+                ? '尚未升级（仍是普通 EOA）'
+                : isMetaMask7702Delegated(eoaCode)
+                  ? `已指向 MetaMask Delegator（${MM_EIP7702_DELEGATOR}）`
+                  : `已委托到其他合约（code ${eoaCode.slice(0, 20)}…）`}
             </p>
           </div>
 
@@ -763,7 +873,53 @@ export default function TokenBank() {
             >
               {busy ? '处理中…' : 'permit2存款'}
             </button>
+            <button
+              type="button"
+              disabled={
+                busy ||
+                !walletClient ||
+                !token ||
+                !amountWei ||
+                amountWei <= 0n ||
+                walletBalanceReadError ||
+                walletBalancePending ||
+                (walletBalance !== undefined && amountWei > walletBalance)
+              }
+              title="通过 wallet_sendCalls 在一笔 Type 4 交易中完成：升级到 MetaMask Delegator（若尚未升级）+ approve + deposit。金额取自上方输入框。已升级后将跳过升级步骤。"
+              onClick={() => void doEip7702Deposit()}
+              style={{
+                ...btnStyle,
+                background: '#6b3fa0',
+                opacity:
+                  busy ||
+                  !walletClient ||
+                  !token ||
+                  !amountWei ||
+                  amountWei <= 0n ||
+                  walletBalanceReadError ||
+                  walletBalancePending ||
+                  (walletBalance !== undefined && amountWei > walletBalance)
+                    ? 0.45
+                    : 1,
+              }}
+            >
+              {busy ? '处理中…' : 'EOA升级账户并授权存款'}
+            </button>
           </div>
+          <p
+            style={{
+              margin: 0,
+              fontSize: '0.75rem',
+              color: '#666',
+              maxWidth: 420,
+              textAlign: 'center',
+              lineHeight: 1.5,
+            }}
+          >
+            「EOA升级账户并授权存款」使用上方金额框。请用 MetaMask 并切换到
+            Sepolia 等 EIP-7702 网络；第一次会提示升级智能账户，之后同一按钮只做
+            approve + deposit。
+          </p>
 
           {error ? (
             <p style={{ margin: 0, color: '#b00020', fontSize: '0.85rem', maxWidth: 400, textAlign: 'center' }}>
